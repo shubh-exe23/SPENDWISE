@@ -1,0 +1,10 @@
+# Python Environment
+venv/
+env/
+__pycache__/
+*.pyc
+
+# Secrets and Databases
+.env
+*.db
+instance/
