@@ -15,6 +15,7 @@ Spendwise features a complete frontend-to-backend pipeline with secure authentic
 
 ### 1. The Dashboard (Homepage)
 A clean, Material Design 3 inspired interface that instantly calculates real-time balances, income, and expenses. Features dynamic currency localization and immediate data retrieval from the PostgreSQL cloud database.
+
 <img width="250" alt="Homepage" src="https://github.com/user-attachments/assets/5cbf4331-75f1-4b39-b47b-a6e480e2bb15" />
 
 ### 2. Core Engine: Adding Transactions
