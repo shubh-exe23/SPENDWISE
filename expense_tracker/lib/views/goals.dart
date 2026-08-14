@@ -9,14 +9,14 @@ class GoalsPage extends StatefulWidget {
   final TransactionController controller;
   final List<Goal> goals;
   final VoidCallback onGoalsChanged; 
-  final VoidCallback onBackToHome; // ── 1. ADD THIS ──
+  final VoidCallback onBackToHome;
 
   const GoalsPage({
     super.key,
     required this.controller,
     required this.goals,
     required this.onGoalsChanged,
-    required this.onBackToHome, // ── 2. UPDATE CONSTRUCTOR ──
+    required this.onBackToHome, 
   });
 
   @override
@@ -61,7 +61,6 @@ class _GoalsPageState extends State<GoalsPage> {
         elevation: 0,
         scrolledUnderElevation: 0,
         centerTitle: true,
-        // ── 3. ADD THE CUSTOM BACK BUTTON HERE ──
         leading: IconButton(
           icon: Icon(Icons.arrow_back, color: textColor),
           onPressed: widget.onBackToHome,
@@ -86,7 +85,6 @@ class _GoalsPageState extends State<GoalsPage> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      // Don't forget to pass 'sym' into these widgets so they update!
                       _overviewSection(cardBg, borderColor, hintColor, sym),
                       const SizedBox(height: 24),
                       Text('Active Goals', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600, color: textColor)),
@@ -95,11 +93,11 @@ class _GoalsPageState extends State<GoalsPage> {
                       const SizedBox(height: 80),
                     ],
                   ),
-                ); // ── FIXED: Semicolon here to end the return statement ──
-        }, // ── FIXED: Added closing brace for the builder function ──
+                ); 
+        }, 
       ),
-    ); // <-- Closes Scaffold
-  } // <-- Closes the build() method
+    ); 
+  } 
 
   Widget _emptyState(Color hintColor) {
     return Center(
@@ -133,7 +131,6 @@ class _GoalsPageState extends State<GoalsPage> {
   Widget _overviewSection(Color cardBg, Color borderColor, Color hintColor, String sym) {
     return Row(
       children: [
-        // We pass 'sym' down to the summary cards here!
         Expanded(child: _summaryCard('Total Budget', _totalBudget, _jade, cardBg, borderColor, hintColor, sym)),
         const SizedBox(width: 10),
         Expanded(child: _summaryCard('Spent', _totalSpent, Colors.redAccent, cardBg, borderColor, hintColor, sym)),
@@ -152,7 +149,6 @@ class _GoalsPageState extends State<GoalsPage> {
         children: [
           Text(label, style: TextStyle(fontSize: 11, color: hintColor)),
           const SizedBox(height: 6),
-          // Replaced hardcoded '₹' with '$sym'
           Text('$sym${amount.toStringAsFixed(0)}', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: valColor)),
         ],
       ),
@@ -216,16 +212,34 @@ class _GoalsPageState extends State<GoalsPage> {
                     ],
                   ),
                 ),
-              IconButton(
-                onPressed: () => _showEditGoalSheet(goal),
-                icon: const Icon(Icons.edit_outlined, size: 18, color: _jade),
-                padding: EdgeInsets.zero,
-                constraints: const BoxConstraints(),
-                style: IconButton.styleFrom(
-                  backgroundColor: isDark ? Colors.white12 : _jadeSoft,
-                  padding: const EdgeInsets.all(6),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                ),
+              // ── NEW EDIT & DELETE ROW ──
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  IconButton(
+                    onPressed: () => _showEditGoalSheet(goal),
+                    icon: const Icon(Icons.edit_outlined, size: 18, color: _jade),
+                    padding: EdgeInsets.zero,
+                    constraints: const BoxConstraints(),
+                    style: IconButton.styleFrom(
+                      backgroundColor: isDark ? Colors.white12 : _jadeSoft,
+                      padding: const EdgeInsets.all(6),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  IconButton(
+                    onPressed: () => _confirmDeleteGoal(goal, cardBg, textColor),
+                    icon: const Icon(Icons.delete_outline, size: 18, color: Colors.redAccent),
+                    padding: EdgeInsets.zero,
+                    constraints: const BoxConstraints(),
+                    style: IconButton.styleFrom(
+                      backgroundColor: isDark ? Colors.red.withOpacity(0.1) : Colors.red.shade50,
+                      padding: const EdgeInsets.all(6),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                    ),
+                  ),
+                ],
               ),
             ],
           ),
@@ -251,7 +265,6 @@ class _GoalsPageState extends State<GoalsPage> {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              // Replaced hardcoded '₹' with '$sym'
               Text('$sym${spent.toStringAsFixed(0)} / $sym${goal.budgetAmount.toStringAsFixed(0)}', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: textColor)),
               Text('${(percent * 100).toStringAsFixed(1)}% Used', style: TextStyle(fontSize: 12, color: color, fontWeight: FontWeight.w600)),
             ],
@@ -265,7 +278,6 @@ class _GoalsPageState extends State<GoalsPage> {
                 children: [
                   Icon(Icons.trending_up, size: 16, color: Colors.red.shade400),
                   const SizedBox(width: 6),
-                  // Replaced hardcoded '₹' with '$sym'
                   Text('Exceeded by $sym${(spent - goal.budgetAmount).toStringAsFixed(0)}', style: TextStyle(fontSize: 12, color: Colors.red.shade400, fontWeight: FontWeight.w600)),
                 ],
               ),
@@ -273,7 +285,6 @@ class _GoalsPageState extends State<GoalsPage> {
           ],
           if (!exceeded) ...[
             const SizedBox(height: 6),
-            // Replaced hardcoded '₹' with '$sym'
             Text('$sym${remaining.toStringAsFixed(0)} remaining', style: TextStyle(fontSize: 12, color: hintColor)),
           ],
         ],
@@ -289,6 +300,52 @@ class _GoalsPageState extends State<GoalsPage> {
 
   void _showEditGoalSheet(Goal goal) {
     showModalBottomSheet(context: context, isScrollControlled: true, backgroundColor: Colors.transparent, builder: (_) => _GoalForm(categories: _getCategories(), existingGoal: goal, onSuccess: widget.onGoalsChanged));
+  }
+
+  // ── NEW DELETE CONFIRMATION DIALOG ──
+  void _confirmDeleteGoal(Goal goal, Color cardBg, Color textColor) {
+    showDialog(
+      context: context,
+      builder: (_) => AlertDialog(
+        backgroundColor: cardBg,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: Text('Delete Goal?', style: TextStyle(fontWeight: FontWeight.w600, color: textColor)),
+        content: Text('Are you sure you want to delete "${goal.name}"? This action cannot be undone.', style: TextStyle(color: textColor, fontSize: 14)),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context), 
+            child: const Text('Cancel', style: TextStyle(color: _jade))
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.redAccent, 
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))
+            ),
+            onPressed: () async {
+              Navigator.pop(context); // Close the dialog immediately
+              
+              if (goal.id != null) {
+                final success = await ApiService.deleteGoal(goal.id!);
+                
+                if (!mounted) return;
+                
+                if (success) {
+                  widget.onGoalsChanged(); // Magically refreshes the UI!
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Goal deleted successfully'), backgroundColor: _jade)
+                  );
+                } else {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Failed to delete goal'), backgroundColor: Colors.redAccent)
+                  );
+                }
+              }
+            },
+            child: const Text('Delete', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600)),
+          ),
+        ],
+      ),
+    );
   }
 
   List<String> _getCategories() {
@@ -467,7 +524,6 @@ class _GoalFormState extends State<_GoalForm> {
               _field(controller: _amountCtrl, hint: '0.00', icon: Icons.currency_rupee, keyboardType: const TextInputType.numberWithOptions(decimal: true), inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'^\d+\.?\d{0,2}'))], cardBg: cardBg, textColor: textColor, hintColor: hintColor, borderColor: borderColor, validator: (v) { if (v == null || v.trim().isEmpty) return 'Amount cannot be empty'; if (double.tryParse(v) == null || double.parse(v) <= 0) return 'Enter a valid amount greater than 0'; return null; }),
               const SizedBox(height: 24),
 
-              // ── THE NEW SLIDER COMPONENT ──
               _label('Alert me when spent reaches (optional)', textColor),
               const SizedBox(height: 12),
               if (_budgetAmount > 0) ...[
@@ -500,7 +556,6 @@ class _GoalFormState extends State<_GoalForm> {
                     value: _alertThreshold,
                     min: 0,
                     max: _budgetAmount,
-                    // Leaving 'divisions' out so it drags completely smooth like butter!
                     onChanged: (val) {
                       setState(() => _alertThreshold = val);
                     },
@@ -515,7 +570,6 @@ class _GoalFormState extends State<_GoalForm> {
                   ),
                 ),
               ] else ...[
-                // Shows a placeholder block if they haven't typed a budget yet
                 Container(
                   width: double.infinity,
                   padding: const EdgeInsets.all(12),

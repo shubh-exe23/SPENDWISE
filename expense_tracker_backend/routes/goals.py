@@ -51,10 +51,20 @@ def update_goal(id):
     db.session.commit()
     return jsonify(g.to_dict()), 200
 
-@goals_bp.route('/<int:id>', methods=['DELETE'])
+# ── FIX: Add the full path here! ──
+# ── FIX: Removed the /api/goals part since the blueprint already handles it! ──
+@goals_bp.route('/<int:goal_id>', methods=['DELETE'])
 @jwt_required()
-def delete_goal(id):
-    g = Goal.query.get_or_404(id)
-    db.session.delete(g)
+def delete_goal(goal_id):
+    user_id = get_jwt_identity()
+    
+    # Query the database for the specific goal
+    goal = Goal.query.filter_by(id=goal_id, user_id=user_id).first()
+    
+    if not goal:
+        return jsonify({"error": "Goal not found or unauthorized"}), 404
+        
+    db.session.delete(goal)
     db.session.commit()
-    return jsonify({'message': 'deleted'}), 200
+    
+    return jsonify({"message": "Goal deleted successfully"}), 200

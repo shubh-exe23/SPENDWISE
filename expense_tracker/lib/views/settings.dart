@@ -3,12 +3,12 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'profile_page.dart';
 import '../services/api_service.dart';
 import 'welcome_screen.dart';
-import '../main.dart'; // ── GLOBAL NOTIFIER IMPORT ──
+import '../main.dart'; 
 
 class SettingsPage extends StatefulWidget {
-  final VoidCallback onBackToHome; // ── 1. ADD THIS ──
+  final VoidCallback onBackToHome;
 
-  const SettingsPage({super.key, required this.onBackToHome}); // ── 2. UPDATE CONSTRUCTOR ──
+  const SettingsPage({super.key, required this.onBackToHome});
 
   @override
   State<SettingsPage> createState() => _SettingsPageState();
@@ -19,11 +19,10 @@ class _SettingsPageState extends State<SettingsPage> {
   static const _jadeDark = Color(0xFF2A7D5F);
 
   late bool _darkMode;
-  bool _goalAlerts       = true; // Defaults to true
+  bool _goalAlerts       = true; 
 
   String _selectedCurrency = '₹ INR';
 
-  // ── DYNAMIC VARIABLES ──
   String _userName = 'User';
   String _userInitial = 'U';
 
@@ -36,10 +35,9 @@ class _SettingsPageState extends State<SettingsPage> {
     _selectedCurrency = currencyNotifier.value;
     
     _loadUserProfile();
-    _loadLocalSettings(); // ── 1. ADD THIS ──
+    _loadLocalSettings(); 
   }
 
-  // ── 2. ADD THIS METHOD TO LOAD SAVED ALERT PREFERENCE ──
   Future<void> _loadLocalSettings() async {
     final prefs = await SharedPreferences.getInstance();
     if (mounted) {
@@ -70,7 +68,6 @@ class _SettingsPageState extends State<SettingsPage> {
 
   @override
   Widget build(BuildContext context) {
-    // ── DARK MODE FORMULA ──
     final isDarkMode = Theme.of(context).brightness == Brightness.dark;
     final bg      = isDarkMode ? const Color(0xFF1A1A2E) : const Color(0xFFF2F2F7);
     final cardBg  = isDarkMode ? const Color(0xFF2A2A3E) : Colors.white;
@@ -79,6 +76,7 @@ class _SettingsPageState extends State<SettingsPage> {
     final divider = isDarkMode ? Colors.white12 : Colors.grey.shade200;
 
     return Scaffold(
+      backgroundColor: bg,
       appBar: AppBar(
         backgroundColor: _jade,
         elevation: 0,
@@ -138,7 +136,6 @@ class _SettingsPageState extends State<SettingsPage> {
                 },
               ),
               _divider(divider),
-              // ── LANGUAGE MOVED TO A COMING SOON BUTTON ──
               _arrowTile(
                 icon: Icons.language_outlined,
                 label: 'Language (English)',
@@ -158,7 +155,6 @@ class _SettingsPageState extends State<SettingsPage> {
                 textPrimary: textPrimary,
                 onChanged: (val) async {
                   setState(() => _goalAlerts = val);
-                  // ── 3. SAVE THE PREFERENCE TO THE DEVICE ──
                   final prefs = await SharedPreferences.getInstance();
                   await prefs.setBool('goal_alerts', val);
                 },
@@ -174,7 +170,7 @@ class _SettingsPageState extends State<SettingsPage> {
                 label: 'Clear Transactions',
                 textPrimary: Colors.redAccent,
                 iconColor: Colors.redAccent,
-                onTap: () => _showClearTransactionsDialog(cardBg, textPrimary, textSecondary), // ── UPDATED CALL ──
+                onTap: () => _showClearTransactionsDialog(cardBg, textPrimary, textSecondary), 
               ),
             ]),
             const SizedBox(height: 24),
@@ -328,8 +324,6 @@ class _SettingsPageState extends State<SettingsPage> {
     );
   }
 
-  // ── THE NEW CLEAR TRANSACTIONS DIALOG ──
-  // ── 1. SELECT TIMEFRAME DIALOG ──
   void _showClearTransactionsDialog(Color cardBg, Color textPrimary, Color textSecondary) {
     String selectedPeriod = 'All Time';
     final List<String> periods = ['Today', 'Yesterday', 'This Week', 'This Month', 'All Time'];
@@ -381,12 +375,11 @@ class _SettingsPageState extends State<SettingsPage> {
                 ),
                 ElevatedButton(
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: _jade, // Changed to Jade since it's just a 'Next' step now
+                    backgroundColor: _jade,
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                   ),
                   onPressed: () {
-                    Navigator.pop(context); // Close the timeframe dialog
-                    // ── OPEN THE CONFIRMATION WARNING ──
+                    Navigator.pop(context); 
                     _showDeleteConfirmationDialog(selectedPeriod, cardBg, textPrimary, textSecondary);
                   },
                   child: const Text('Next', style: TextStyle(color: Colors.white)),
@@ -399,7 +392,6 @@ class _SettingsPageState extends State<SettingsPage> {
     );
   }
 
-  // ── 2. THE FINAL CONFIRMATION WARNING ──
   void _showDeleteConfirmationDialog(String period, Color cardBg, Color textPrimary, Color textSecondary) {
     showDialog(
       context: context,
@@ -433,13 +425,21 @@ class _SettingsPageState extends State<SettingsPage> {
               backgroundColor: Colors.redAccent, 
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))
             ),
-            onPressed: () {
-              Navigator.pop(context); // Close this final dialog
+            onPressed: () async {
+              Navigator.pop(context); 
               
-              // TODO: Connect this to the backend controller later to actually delete
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(content: Text('Successfully deleted transactions for: $period'), backgroundColor: _jade),
-              );
+              final success = await ApiService.clearTransactions(period);
+              if (mounted) {
+                if (success) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text('Successfully deleted transactions for: $period'), backgroundColor: _jade),
+                  );
+                } else {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Failed to delete transactions.'), backgroundColor: Colors.redAccent),
+                  );
+                }
+              }
             },
             child: const Text('Yes, Delete', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600)),
           ),

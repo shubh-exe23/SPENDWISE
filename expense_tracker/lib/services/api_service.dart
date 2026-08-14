@@ -115,6 +115,22 @@ class ApiService {
     } catch (e) { return false; }
   }
 
+  static Future<bool> clearTransactions(String period) async {
+    try {
+      final token = await getToken();
+      final response = await http.delete(
+        Uri.parse('$baseUrl/api/transactions/clear?period=$period'),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+      );
+      return response.statusCode == 200;
+    } catch (e) {
+      return false;
+    }
+  }
+
   // ════════════════════════════
   //  GOALS
   // ════════════════════════════
@@ -167,6 +183,27 @@ class ApiService {
       return false;
     }
   }
+
+  static Future<bool> deleteGoal(int id) async {
+    try {
+      final token = await getToken();
+      final url = '$baseUrl/goals/$id'; // Fixed path without /api/
+      
+      final response = await http.delete(
+        Uri.parse(url),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+      );
+      
+      return response.statusCode == 200;
+    } catch (e) {
+      print('Delete Goal Error: $e');
+      return false;
+    }
+  }
+
   // ════════════════════════════
   //  NOTIFICATIONS
   // ════════════════════════════
@@ -202,6 +239,7 @@ class ApiService {
       return response.statusCode == 200;
     } catch (e) { return false; }
   }
+
   // ════════════════════════════
   //  USER PROFILE / SETTINGS
   // ════════════════════════════
@@ -218,6 +256,7 @@ class ApiService {
       return false;
     }
   }
+
   static Future<Map<String, dynamic>?> getProfile() async {
     try {
       final headers = await _headers;
@@ -230,15 +269,15 @@ class ApiService {
       return null;
     }
   }
+
   static Future<Map<String, dynamic>> forgotPassword(String email) async {
     try {
       final response = await http.post(
-        Uri.parse('$baseUrl/auth/forgot-password'), // ── ADDED /auth BACK IN ──
+        Uri.parse('$baseUrl/auth/forgot-password'), 
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode({'email': email}),
       );
       
-      // If the server returns a 404 HTML page, we catch it gracefully
       if (response.statusCode != 200 && response.statusCode != 201) {
          try {
            return jsonDecode(response.body);
@@ -249,7 +288,7 @@ class ApiService {
       
       return jsonDecode(response.body);
     } catch (e) {
-      print('Forgot Password Error: $e'); // ── PRINTS THE REAL ERROR TO YOUR CONSOLE ──
+      print('Forgot Password Error: $e'); 
       return {'success': false, 'message': 'Could not connect to server'};
     }
   }
@@ -257,7 +296,7 @@ class ApiService {
   static Future<Map<String, dynamic>> resetPassword(String email, String otp, String newPassword) async {
     try {
       final response = await http.post(
-        Uri.parse('$baseUrl/auth/reset-password'), // ── ADDED /auth BACK IN ──
+        Uri.parse('$baseUrl/auth/reset-password'),
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode({'email': email, 'otp': otp, 'new_password': newPassword}),
       );
