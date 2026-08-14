@@ -69,5 +69,5 @@ A robust login and registration flow engineered with JWT (JSON Web Tokens) and W
 
 ### 1. Clone the Repository
 ```bash
-git clone [https://github.com/YOUR_USERNAME/spendwise.git](https://github.com/YOUR_USERNAME/spendwise.git)
+git clone [https://github.com/shubh-exe23/SPENDWISE.git](https://github.com/shubh-exe23/SPENDWISE.git)
 cd spendwise
