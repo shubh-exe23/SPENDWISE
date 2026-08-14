@@ -5,9 +5,9 @@ import '../models/transaction.dart';
 
 class AnalysisPage extends StatefulWidget {
   final TransactionController controller;
-  final VoidCallback onBackToHome; // ── 1. ADD THIS ──
+  final VoidCallback onBackToHome; 
   
-  const AnalysisPage({super.key, required this.controller, required this.onBackToHome}); // ── 2. UPDATE CONSTRUCTOR ──
+  const AnalysisPage({super.key, required this.controller, required this.onBackToHome}); 
 
   @override
   State<AnalysisPage> createState() => _AnalysisPageState();
@@ -67,16 +67,48 @@ class _AnalysisPageState extends State<AnalysisPage> {
     final total   = _grandTotal;
 
     return Scaffold(
-     appBar: AppBar(
+      backgroundColor: bg,
+      appBar: AppBar(
         backgroundColor: Colors.transparent, elevation: 0, scrolledUnderElevation: 0, centerTitle: true,
-        // ── 3. ADD THE CUSTOM BACK BUTTON HERE ──
         leading: IconButton(
           icon: Icon(Icons.arrow_back, color: textColor),
           onPressed: widget.onBackToHome,
         ),
         title: Text('Analyze Your Expenses', style: TextStyle(color: textColor, fontWeight: FontWeight.w600, fontSize: 18)),
       ),
-      body: totals.isEmpty ? _emptyState(hintColor) : _content(totals, total, cardBg, textColor, hintColor, borderColor, isDarkMode),
+      body: Column(
+        children: [
+          const SizedBox(height: 8),
+          // ── THE FILTER IS NOW PERSISTENT AT THE TOP ──
+          Center(
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 3),
+              decoration: BoxDecoration(
+                color: isDarkMode ? Colors.white12 : const Color(0xFFE8F5F0), 
+                borderRadius: BorderRadius.circular(12), 
+                border: Border.all(color: borderColor)
+              ),
+              child: DropdownButtonHideUnderline(
+                child: DropdownButton<String>(
+                  value: _filter,
+                  style: TextStyle(color: textColor, fontSize: 13, fontWeight: FontWeight.w600),
+                  icon: const Icon(Icons.keyboard_arrow_down, color: _jade, size: 18),
+                  dropdownColor: cardBg,
+                  items: _filters.map((f) => DropdownMenuItem(value: f, child: Text(f))).toList(),
+                  onChanged: _onFilterChanged,
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(height: 8),
+          // ── WE USE EXPANDED SO THE EMPTY STATE CENTERS PROPERLY ──
+          Expanded(
+            child: totals.isEmpty 
+                ? _emptyState(hintColor) 
+                : _content(totals, total, cardBg, textColor, hintColor, borderColor, isDarkMode),
+          ),
+        ],
+      ),
     );
   }
 
@@ -106,23 +138,6 @@ class _AnalysisPageState extends State<AnalysisPage> {
             decoration: BoxDecoration(color: cardBg, borderRadius: BorderRadius.circular(20), border: Border.all(color: borderColor)),
             child: Column(
               children: [
-                Center(
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 3),
-                    decoration: BoxDecoration(color: isDark ? Colors.white12 : const Color(0xFFE8F5F0), borderRadius: BorderRadius.circular(12), border: Border.all(color: borderColor)),
-                    child: DropdownButtonHideUnderline(
-                      child: DropdownButton<String>(
-                        value: _filter,
-                        style: TextStyle(color: textColor, fontSize: 13, fontWeight: FontWeight.w600),
-                        icon: const Icon(Icons.keyboard_arrow_down, color: _jade, size: 18),
-                        dropdownColor: cardBg,
-                        items: _filters.map((f) => DropdownMenuItem(value: f, child: Text(f))).toList(),
-                        onChanged: _onFilterChanged,
-                      ),
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 16),
                 _chartTypeToggle(isDark, textColor),
                 const SizedBox(height: 24),
                 SizedBox(height: 220, child: _isDonut ? _donutChart(totals, total) : _pieChart(totals, total)),
