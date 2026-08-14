@@ -175,6 +175,24 @@ class _MyHomePageState extends State<MyHomePage> {
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
+                      // ── DROPDOWN MOVED TO THE LEFT ──
+                      DropdownButton<String>(
+                        value: selectDateFilter,
+                        dropdownColor: const Color(0xFF3EB489),
+                        style: const TextStyle(color: Colors.white),
+                        iconEnabledColor: Colors.white,
+                        underline: const SizedBox(),
+                        items: dateoptions.map((option) => DropdownMenuItem(value: option, child: Text(option))).toList(),
+                        onChanged: (value) async {
+                          setState(() => selectDateFilter = value!);
+                          if (value == 'Custom') {
+                            DateTime? picked = await showDatePicker(context: context, initialDate: DateTime.now(), firstDate: DateTime(2020), lastDate: DateTime.now());
+                            if (picked != null) setState(() => customDate = picked);
+                          }
+                        },
+                      ),
+                      
+                      // ── FUNCTIONAL NOTIFICATION ICON ON THE RIGHT ──
                       GestureDetector(
                         onTap: () async {
                           await Navigator.push(context, MaterialPageRoute(builder: (_) => NotificationPage(notificationController: _notificationController)));
@@ -195,22 +213,6 @@ class _MyHomePageState extends State<MyHomePage> {
                           ],
                         ),
                       ),
-                      DropdownButton<String>(
-                        value: selectDateFilter,
-                        dropdownColor: const Color(0xFF3EB489),
-                        style: const TextStyle(color: Colors.white),
-                        iconEnabledColor: Colors.white,
-                        underline: const SizedBox(),
-                        items: dateoptions.map((option) => DropdownMenuItem(value: option, child: Text(option))).toList(),
-                        onChanged: (value) async {
-                          setState(() => selectDateFilter = value!);
-                          if (value == 'Custom') {
-                            DateTime? picked = await showDatePicker(context: context, initialDate: DateTime.now(), firstDate: DateTime(2020), lastDate: DateTime.now());
-                            if (picked != null) setState(() => customDate = picked);
-                          }
-                        },
-                      ),
-                      const CircleAvatar(radius: 25, child: Icon(Icons.notifications_outlined)),
                     ],
                   ),
                   const SizedBox(height: 16),
