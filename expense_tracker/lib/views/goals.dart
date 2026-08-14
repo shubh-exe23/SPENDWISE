@@ -9,12 +9,14 @@ class GoalsPage extends StatefulWidget {
   final TransactionController controller;
   final List<Goal> goals;
   final VoidCallback onGoalsChanged; 
+  final VoidCallback onBackToHome; // ── 1. ADD THIS ──
 
   const GoalsPage({
     super.key,
     required this.controller,
     required this.goals,
     required this.onGoalsChanged,
+    required this.onBackToHome, // ── 2. UPDATE CONSTRUCTOR ──
   });
 
   @override
@@ -54,12 +56,16 @@ class _GoalsPageState extends State<GoalsPage> {
     final borderColor = isDarkMode ? Colors.white12 : _jadeChip;
 
     return Scaffold(
-      backgroundColor: bg,
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         elevation: 0,
         scrolledUnderElevation: 0,
         centerTitle: true,
+        // ── 3. ADD THE CUSTOM BACK BUTTON HERE ──
+        leading: IconButton(
+          icon: Icon(Icons.arrow_back, color: textColor),
+          onPressed: widget.onBackToHome,
+        ),
         title: Text('Goals', style: TextStyle(color: textColor, fontWeight: FontWeight.w600, fontSize: 18)),
       ),
       floatingActionButton: FloatingActionButton(

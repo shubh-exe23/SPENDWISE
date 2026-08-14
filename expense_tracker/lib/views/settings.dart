@@ -6,7 +6,9 @@ import 'welcome_screen.dart';
 import '../main.dart'; // ── GLOBAL NOTIFIER IMPORT ──
 
 class SettingsPage extends StatefulWidget {
-  const SettingsPage({super.key});
+  final VoidCallback onBackToHome; // ── 1. ADD THIS ──
+
+  const SettingsPage({super.key, required this.onBackToHome}); // ── 2. UPDATE CONSTRUCTOR ──
 
   @override
   State<SettingsPage> createState() => _SettingsPageState();
@@ -77,12 +79,15 @@ class _SettingsPageState extends State<SettingsPage> {
     final divider = isDarkMode ? Colors.white12 : Colors.grey.shade200;
 
     return Scaffold(
-      backgroundColor: bg,
       appBar: AppBar(
         backgroundColor: _jade,
         elevation: 0,
         centerTitle: true,
         iconTheme: const IconThemeData(color: Colors.white),
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back),
+          onPressed: widget.onBackToHome, 
+        ),
         title: const Text('Settings',
             style: TextStyle(
                 color: Colors.white,

@@ -44,12 +44,12 @@ class NotificationService {
 
     const AndroidNotificationDetails androidDetails =
         AndroidNotificationDetails(
-      'budget_warning',           // channel id
-      'Budget Warnings',          // channel name
+      'budget_warning_v2',        // <-- NEW ID FORCES A FRESH CHANNEL
+      'Budget Warnings',          
       channelDescription: 'Alerts when budget is almost exhausted',
-      importance: Importance.high,
-      priority: Priority.high,
-      color: Color(0xFFFF9800),   // orange
+      importance: Importance.max, // <-- BUMPED TO MAX
+      priority: Priority.max,     // <-- BUMPED TO MAX
+      color: Color(0xFFFF9800),   
       icon: '@mipmap/ic_launcher',
     );
 
@@ -58,7 +58,7 @@ class NotificationService {
     );
 
     await _plugin.show(
-      1, // notification id
+      1, 
       '⚠️ Budget Warning!',
       '$goalName — Only ₹${remaining.toStringAsFixed(0)} left!',
       details,
@@ -74,12 +74,12 @@ class NotificationService {
 
     const AndroidNotificationDetails androidDetails =
         AndroidNotificationDetails(
-      'budget_exceeded',          // channel id
-      'Budget Exceeded',          // channel name
+      'budget_exceeded_v2',       // <-- NEW ID FORCES A FRESH CHANNEL
+      'Budget Exceeded',          
       channelDescription: 'Alerts when budget is exceeded',
-      importance: Importance.max,
-      priority: Priority.max,
-      color: Color(0xFFE53935),   // red
+      importance: Importance.max, 
+      priority: Priority.max,     
+      color: Color(0xFFE53935),   
       icon: '@mipmap/ic_launcher',
     );
 
@@ -88,7 +88,7 @@ class NotificationService {
     );
 
     await _plugin.show(
-      2, // notification id
+      2, 
       '🚨 Budget Exceeded!',
       '$goalName — Exceeded by ₹${exceededBy.toStringAsFixed(0)}!',
       details,

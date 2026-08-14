@@ -80,10 +80,16 @@ class _MyHomePageState extends State<MyHomePage> {
                     controller: _controller,
                     goals: _goals,
                     onGoalsChanged: () => _loadData(),
+                    onBackToHome: () => setState(() => _currentIndex = 0), // ── ADDED ──
                   )
                 : _currentIndex == 2
-                    ? AnalysisPage(controller: _controller)
-                    : const SettingsPage(), // ── CLEAN CALL ──
+                    ? AnalysisPage(
+                        controller: _controller,
+                        onBackToHome: () => setState(() => _currentIndex = 0), // ── ADDED ──
+                      )
+                    : SettingsPage(
+                        onBackToHome: () => setState(() => _currentIndex = 0), // ── ADDED ──
+                      ), // ── CLEAN CALL ──
 
         floatingActionButton: _currentIndex == 0
             ? FloatingActionButton(
@@ -175,7 +181,11 @@ class _MyHomePageState extends State<MyHomePage> {
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      // ── DROPDOWN MOVED TO THE LEFT ──
+                      // ── INVISIBLE PLACEHOLDER TO KEEP DROPDOWN CENTERED ──
+                      // This is exactly 50px wide to balance the CircleAvatar on the right.
+                      const SizedBox(width: 50),
+                      
+                      // ── CENTERED DROPDOWN ──
                       DropdownButton<String>(
                         value: selectDateFilter,
                         dropdownColor: const Color(0xFF3EB489),
