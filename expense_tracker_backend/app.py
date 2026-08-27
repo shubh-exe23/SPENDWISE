@@ -4,6 +4,13 @@ from flask_jwt_extended import JWTManager, jwt_required, get_jwt_identity
 from config import Config
 from models.database import db
 from datetime import datetime, timedelta
+from routes.subscriptions import subscriptions_bp
+from apscheduler.schedulers.background import BackgroundScheduler
+from cron import check_and_process_subscriptions
+from routes.magic import magic_bp
+from routes.categories import categories_bp
+from routes.outings import outings_bp
+from routes.analysis import analysis_bp
 
 app = Flask(__name__)
 app.config.from_object(Config)
@@ -11,6 +18,17 @@ app.config.from_object(Config)
 CORS(app)
 JWTManager(app)
 db.init_app(app)
+
+# ── START THE SUBSCRIPTION AUTOMATOR ──
+scheduler = BackgroundScheduler()
+
+# For PRODUCTION: Check once every 24 hours
+scheduler.add_job(func=lambda: check_and_process_subscriptions(app), trigger="interval", hours=24)
+
+# FOR TESTING TODAY: Uncomment the line below to make it check every 1 minute!
+#scheduler.add_job(func=lambda: check_and_process_subscriptions(app), trigger="interval", minutes=1)
+
+scheduler.start()
 
 # import models explicitly here
 from models.user         import User
@@ -63,6 +81,11 @@ app.register_blueprint(auth_bp,url_prefix='/auth')
 app.register_blueprint(transactions_bp)
 app.register_blueprint(goals_bp)
 app.register_blueprint(notifications_bp)
+app.register_blueprint(subscriptions_bp)
+app.register_blueprint(magic_bp, url_prefix='/api/magic')
+app.register_blueprint(categories_bp)
+app.register_blueprint(outings_bp)
+app.register_blueprint(analysis_bp)
 
 if __name__ == '__main__':
     with app.app_context():

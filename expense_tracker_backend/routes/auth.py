@@ -67,10 +67,11 @@ def update_profile():
         user.name = data['name']
     if 'currency' in data:
         user.currency = data['currency']
+    if 'avatar' in data:                      
+        user.profile_pic = data['avatar'] # ── SAVES TO profile_pic ──
         
     db.session.commit()
     return jsonify(user.to_dict()), 200
-
 
 # ==========================================
 #  SECURED OTP / FORGOT PASSWORD ROUTES
