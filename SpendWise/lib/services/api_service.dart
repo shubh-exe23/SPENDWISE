@@ -4,7 +4,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'notification_service.dart';
 
 class ApiService {
-  static const String baseUrl = 'http://10.138.15.245:5000';
+  static const String baseUrl = 'https://spendwise-hz00.onrender.com';
 
   // ── TOKEN MANAGEMENT ──
   static Future<void> saveToken(String token) async {
