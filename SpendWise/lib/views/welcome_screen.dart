@@ -82,8 +82,6 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
     final dotColor   = isDarkMode ? Colors.white24 : Colors.grey.shade300;
     final iconBg     = isDarkMode ? Colors.white12 : const Color(0xFFE8F5F0);
 
-    final double imageSize = MediaQuery.of(context).size.width - 48;
-
     return Scaffold(
       backgroundColor: bg,
       body: SafeArea(
@@ -127,9 +125,21 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
                 itemBuilder: (context, index) {
                   return Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 24),
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
+                    child: LayoutBuilder(
+                      builder: (context, slotConstraints) {
+                        // Reserve space for the 36px gap + caption text below
+                        // the image, then size the (square) image to whichever
+                        // is smaller: available width or available height —
+                        // so it always fits, on any screen or frame size.
+                        const reservedForTextAndGap = 130.0;
+                        final double imageSize = [
+                          slotConstraints.maxWidth,
+                          slotConstraints.maxHeight - reservedForTextAndGap,
+                        ].reduce((a, b) => a < b ? a : b).clamp(0.0, double.infinity);
+
+                        return Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
                         Container(
                           height: imageSize,
                           width: imageSize,
@@ -166,7 +176,9 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
                             letterSpacing: -0.5, 
                           )
                         ),
-                      ],
+                          ],
+                        );
+                      },
                     ),
                   );
                 },

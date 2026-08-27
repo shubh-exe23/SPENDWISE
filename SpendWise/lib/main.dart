@@ -43,6 +43,58 @@ class MyApp extends StatelessWidget {
           theme: AppTheme.darkTheme, 
           darkTheme: AppTheme.darkTheme,
           themeMode: ThemeMode.dark,
+          // ── WRAPS THE APP IN A PHONE FRAME ON WIDE (DESKTOP/WEB) SCREENS ──
+          builder: (context, child) {
+            return MediaQuery(
+              data: MediaQuery.of(context).copyWith(
+                textScaler: const TextScaler.linear(1.0),
+              ),
+              child: Scaffold(
+                backgroundColor: const Color(0xFF0F0F1A),
+                body: Center(
+                  child: LayoutBuilder(
+                    builder: (context, constraints) {
+                      if (constraints.maxWidth > 480) {
+                        const frameWidth = 420.0;
+                        const frameHeight = 850.0;
+                        return Container(
+                          width: frameWidth,
+                          height: frameHeight,
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF1A1A2E),
+                            borderRadius: BorderRadius.circular(36),
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.black.withOpacity(0.5),
+                                blurRadius: 40,
+                                spreadRadius: 5,
+                              ),
+                            ],
+                            border: Border.all(
+                              color: Colors.white.withOpacity(0.1),
+                              width: 8,
+                            ),
+                          ),
+                          child: ClipRRect(
+                            borderRadius: BorderRadius.circular(28),
+                            // Make everything inside believe the screen is
+                            // exactly the frame size, not the real browser window.
+                            child: MediaQuery(
+                              data: MediaQuery.of(context).copyWith(
+                                size: const Size(frameWidth, frameHeight),
+                              ),
+                              child: child!,
+                            ),
+                          ),
+                        );
+                      }
+                      return child!;
+                    },
+                  ),
+                ),
+              ),
+            );
+          },
           home: const SplashScreen(),
         );
       },
