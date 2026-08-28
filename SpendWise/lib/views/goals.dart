@@ -30,18 +30,33 @@ class _GoalsPageState extends State<GoalsPage> {
   static const _jadeChip  = Color(0xFFCCEDE2);
 
   double _spentForGoal(Goal goal) {
-    // ── THE FIX: Make the goal category safe ──
     final safeGoalCat = goal.category.trim().toLowerCase();
+
+    // ── THE FIX: Normalize goal date bounds to whole days ──
+    // Start at 00:00:00.000 of start date
+    final startOfDay = DateTime(
+      goal.startDate.year,
+      goal.startDate.month,
+      goal.startDate.day,
+      0, 0, 0, 0,
+    );
+
+    // End at 23:59:59.999 of end date
+    final endOfDay = DateTime(
+      goal.endDate.year,
+      goal.endDate.month,
+      goal.endDate.day,
+      23, 59, 59, 999,
+    );
     
     return widget.controller.allTransactions
         .where((t) {
-          // ── THE FIX: Make the transaction category safe ──
           final safeTxnCat = t.category.trim().toLowerCase();
           
           return t.isExpense && 
                  safeTxnCat == safeGoalCat && 
-                 !t.date.isBefore(goal.startDate) && 
-                 !t.date.isAfter(goal.endDate);
+                 !t.date.isBefore(startOfDay) && 
+                 !t.date.isAfter(endOfDay);
         })
         .fold(0.0, (sum, t) => sum + t.amount);
   }
@@ -59,17 +74,15 @@ class _GoalsPageState extends State<GoalsPage> {
   @override
   Widget build(BuildContext context) {
     final isDarkMode = Theme.of(context).brightness == Brightness.dark;
-    
-    // ── 1. USE GLOBAL GRAPHITE THEME ──
     final bg         = Theme.of(context).scaffoldBackgroundColor;
     final cardBg     = Theme.of(context).cardColor;
     
-    final textColor  = isDarkMode ? Colors.white : _jadeDark;
-    final hintColor  = isDarkMode ? Colors.white54 : Colors.grey.shade500;
+    final textColor   = isDarkMode ? Colors.white : _jadeDark;
+    final hintColor   = isDarkMode ? Colors.white54 : Colors.grey.shade500;
     final borderColor = isDarkMode ? Colors.white12 : _jadeChip;
 
     return Scaffold(
-      backgroundColor: bg, // ── 2. ADD THIS TO APPLY THE BACKGROUND ──
+      backgroundColor: bg,
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         elevation: 0,
@@ -226,7 +239,6 @@ class _GoalsPageState extends State<GoalsPage> {
                     ],
                   ),
                 ),
-              // ── NEW EDIT & DELETE ROW ──
               Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
@@ -316,7 +328,6 @@ class _GoalsPageState extends State<GoalsPage> {
     showModalBottomSheet(context: context, isScrollControlled: true, backgroundColor: Colors.transparent, builder: (_) => _GoalForm(categories: _getCategories(), existingGoal: goal, onSuccess: widget.onGoalsChanged));
   }
 
-  // ── NEW DELETE CONFIRMATION DIALOG ──
   void _confirmDeleteGoal(Goal goal, Color cardBg, Color textColor) {
     showDialog(
       context: context,
@@ -336,7 +347,7 @@ class _GoalsPageState extends State<GoalsPage> {
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))
             ),
             onPressed: () async {
-              Navigator.pop(context); // Close the dialog immediately
+              Navigator.pop(context);
               
               if (goal.id != null) {
                 final success = await ApiService.deleteGoal(goal.id!);
@@ -344,7 +355,7 @@ class _GoalsPageState extends State<GoalsPage> {
                 if (!mounted) return;
                 
                 if (success) {
-                  widget.onGoalsChanged(); // Magically refreshes the UI!
+                  widget.onGoalsChanged();
                   ScaffoldMessenger.of(context).showSnackBar(
                     const SnackBar(content: Text('Goal deleted successfully'), backgroundColor: _jade)
                   );
@@ -390,14 +401,15 @@ class _GoalFormState extends State<_GoalForm> {
 
   final _formKey   = GlobalKey<FormState>();
   final _nameCtrl  = TextEditingController();
-  final _amountCtrl = TextEditingController(); // Budget field
+  final _amountCtrl = TextEditingController();
 
   String? _selectedCategory;
-  DateTime _startDate = DateTime.now();
-  DateTime _endDate   = DateTime.now().add(const Duration(days: 30));
+  
+  // ── FIX: Initialize normalized dates ──
+  late DateTime _startDate;
+  late DateTime _endDate;
   bool _isLoading = false;
 
-  // ── SLIDER STATE VARIABLES ──
   double _budgetAmount = 0.0;
   double _alertThreshold = 0.0;
 
@@ -405,7 +417,10 @@ class _GoalFormState extends State<_GoalForm> {
   void initState() {
     super.initState();
     
-    // Listen to changes in the budget text field to dynamically update the slider's max limit
+    final now = DateTime.now();
+    _startDate = DateTime(now.year, now.month, now.day, 0, 0, 0);
+    _endDate   = DateTime(now.year, now.month, now.day, 23, 59, 59).add(const Duration(days: 30));
+
     _amountCtrl.addListener(_updateBudgetFromText);
 
     if (widget.existingGoal != null) {
@@ -424,10 +439,7 @@ class _GoalFormState extends State<_GoalForm> {
 
   void _updateBudgetFromText() {
     setState(() {
-      // Safely parse what the user types
       _budgetAmount = double.tryParse(_amountCtrl.text.trim()) ?? 0.0;
-      
-      // Auto-correct: If they lower the budget below the threshold, clamp the threshold down
       if (_alertThreshold > _budgetAmount) {
         _alertThreshold = _budgetAmount;
       }
@@ -436,7 +448,7 @@ class _GoalFormState extends State<_GoalForm> {
 
   @override
   void dispose() {
-    _amountCtrl.removeListener(_updateBudgetFromText); // Clean up memory
+    _amountCtrl.removeListener(_updateBudgetFromText);
     _nameCtrl.dispose();
     _amountCtrl.dispose();
     super.dispose();
@@ -444,10 +456,24 @@ class _GoalFormState extends State<_GoalForm> {
 
   Future<void> _pickDate({required bool isStart}) async {
     final picked = await showDatePicker(
-      context: context, initialDate: isStart ? _startDate : _endDate, firstDate: DateTime(2020), lastDate: DateTime(2030),
-      builder: (context, child) => Theme(data: Theme.of(context).copyWith(colorScheme: const ColorScheme.light(primary: _jade)), child: child!),
+      context: context, 
+      initialDate: isStart ? _startDate : _endDate, 
+      firstDate: DateTime(2020), 
+      lastDate: DateTime(2030),
+      builder: (context, child) => Theme(
+        data: Theme.of(context).copyWith(colorScheme: const ColorScheme.light(primary: _jade)), 
+        child: child!
+      ),
     );
-    if (picked != null) setState(() { if (isStart) _startDate = picked; else _endDate = picked; });
+    if (picked != null) {
+      setState(() { 
+        if (isStart) {
+          _startDate = DateTime(picked.year, picked.month, picked.day, 0, 0, 0);
+        } else {
+          _endDate = DateTime(picked.year, picked.month, picked.day, 23, 59, 59);
+        }
+      });
+    }
   }
 
   Future<void> _submit() async {
@@ -457,7 +483,6 @@ class _GoalFormState extends State<_GoalForm> {
 
     setState(() => _isLoading = true);
 
-    // If the slider is at 0, that means they don't want an alert. Otherwise, send the slider's value!
     final parsedThreshold = _alertThreshold > 0 ? _alertThreshold : null;
 
     final goal = Goal(
@@ -465,8 +490,8 @@ class _GoalFormState extends State<_GoalForm> {
       name:           _nameCtrl.text.trim(),
       category:       _selectedCategory!,
       budgetAmount:   _budgetAmount,
-      startDate:      _startDate,
-      endDate:        _endDate,
+      startDate:      DateTime(_startDate.year, _startDate.month, _startDate.day, 0, 0, 0),
+      endDate:        DateTime(_endDate.year, _endDate.month, _endDate.day, 23, 59, 59),
       alertThreshold: parsedThreshold,
     );
 
@@ -491,13 +516,11 @@ class _GoalFormState extends State<_GoalForm> {
   @override
   Widget build(BuildContext context) {
     final isDarkMode = Theme.of(context).brightness == Brightness.dark;
-    
-    // ── UPDATE THE BOTTOM SHEET COLORS ──
     final bg         = Theme.of(context).scaffoldBackgroundColor;
     final cardBg     = Theme.of(context).cardColor;
     
-    final textColor  = isDarkMode ? Colors.white : _jadeDark;
-    final hintColor  = isDarkMode ? Colors.white54 : Colors.grey.shade500;
+    final textColor   = isDarkMode ? Colors.white : _jadeDark;
+    final hintColor   = isDarkMode ? Colors.white54 : Colors.grey.shade500;
     final borderColor = isDarkMode ? Colors.white12 : const Color(0xFFCCEDE2);
     final chipBg     = isDarkMode ? const Color(0xFF3B3B4F) : const Color(0xFFCCEDE2);
 
