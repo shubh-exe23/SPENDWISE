@@ -3,6 +3,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../services/api_service.dart';
 import 'homepage.dart';
 import '../main.dart'; // To update the global currencyNotifier
+import 'avatar_selection_page.dart'; // ── MAKE SURE THIS IMPORT MATCHES YOUR FILE NAME ──
 
 class OnboardingScreen extends StatefulWidget {
   const OnboardingScreen({super.key});
@@ -22,6 +23,9 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   final TextEditingController _nameCtrl = TextEditingController();
   String _selectedCurrency = '₹ INR';
   final List<String> _currencies = ['₹ INR', '\$ USD', '€ EUR', '£ GBP', '¥ JPY'];
+  
+  // ── NEW: AVATAR SELECTION STATE ──
+  String? _selectedAvatar; 
 
   @override
   void dispose() {
@@ -43,10 +47,11 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   Future<void> _finishSetup() async {
     setState(() => _isLoading = true);
 
-    // 1. Save preferences to database
+    // 1. Save preferences to database (Now including the avatar!)
     final success = await ApiService.updateProfile({
       'name': _nameCtrl.text.trim(),
       'currency': _selectedCurrency,
+      if (_selectedAvatar != null) 'avatar': _selectedAvatar,
     });
 
     if (success) {
@@ -54,6 +59,11 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
       currencyNotifier.value = _selectedCurrency;
       final prefs = await SharedPreferences.getInstance();
       await prefs.setString('currency', _selectedCurrency);
+      
+      // Save the avatar locally so the homepage can display it immediately
+      if (_selectedAvatar != null) {
+        await prefs.setString('avatar', _selectedAvatar!);
+      }
 
       if (!mounted) return;
       
@@ -223,25 +233,46 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
         children: [
           Text('Make it yours', style: TextStyle(fontSize: 32, fontWeight: FontWeight.w700, color: textColor)),
           const SizedBox(height: 8),
-          Text('Upload a profile picture (Optional)', style: TextStyle(fontSize: 16, color: hintColor)),
+          Text('Choose a profile picture (Optional)', style: TextStyle(fontSize: 16, color: hintColor)),
           const SizedBox(height: 40),
-          Stack(
-            alignment: Alignment.bottomRight,
-            children: [
-              CircleAvatar(
-                radius: 70,
-                backgroundColor: cardBg,
-                child: Icon(Icons.person, size: 70, color: hintColor.withOpacity(0.3)),
-              ),
-              Container(
-                padding: const EdgeInsets.all(12),
-                decoration: const BoxDecoration(color: _jade, shape: BoxShape.circle),
-                child: const Icon(Icons.camera_alt, color: Colors.white, size: 22),
-              ),
-            ],
+          
+          // ── TAP TO OPEN AVATAR SELECTION ──
+          GestureDetector(
+            onTap: () async {
+              final result = await Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const AvatarSelectionPage()),
+              );
+              
+              // If the user selected an avatar and didn't just hit the back button
+              if (result != null && result is String) {
+                setState(() {
+                  _selectedAvatar = result;
+                });
+              }
+            },
+            child: Stack(
+              alignment: Alignment.bottomRight,
+              children: [
+                CircleAvatar(
+                  radius: 70,
+                  backgroundColor: cardBg,
+                  // Show the selected avatar if one exists, otherwise null
+                  backgroundImage: _selectedAvatar != null ? AssetImage(_selectedAvatar!) : null,
+                  // Show the default icon only if no avatar is selected
+                  child: _selectedAvatar == null 
+                      ? Icon(Icons.person, size: 70, color: hintColor.withOpacity(0.3))
+                      : null,
+                ),
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: const BoxDecoration(color: _jade, shape: BoxShape.circle),
+                  // Changed the camera icon to an edit icon since they are choosing an avatar
+                  child: const Icon(Icons.edit, color: Colors.white, size: 22),
+                ),
+              ],
+            ),
           ),
-          const SizedBox(height: 24),
-          Text('Image upload logic coming soon', style: TextStyle(fontSize: 13, color: hintColor, fontStyle: FontStyle.italic)),
         ],
       ),
     );
