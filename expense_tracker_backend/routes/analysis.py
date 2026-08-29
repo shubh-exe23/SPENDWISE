@@ -1,4 +1,4 @@
-from flask import Blueprint, jsonify
+from flask import Blueprint, jsonify, request  # ── ADDED 'request' HERE ──
 from flask_jwt_extended import jwt_required, get_jwt_identity
 import google.generativeai as genai
 import os
@@ -15,6 +15,9 @@ analysis_bp = Blueprint('analysis', __name__, url_prefix='/analysis')
 @jwt_required()
 def get_insights():
     user_id = get_jwt_identity()
+    
+    # ── GRAB THE CURRENCY FROM THE FLUTTER APP (Defaults to INR if missing) ──
+    user_currency = request.args.get('currency', '₹ INR')
     
     # Fetch transactions from the last 30 days
     thirty_days_ago = datetime.utcnow() - timedelta(days=30)
@@ -35,11 +38,15 @@ def get_insights():
         if t.is_expense:
             categories[t.category] = categories.get(t.category, 0) + t.amount
             
+    # ── INJECT THE CURRENCY DIRECTLY INTO THE PROMPT ──
     prompt = f"""
     You are a concise, highly intelligent financial advisor. 
+    
+    CRITICAL INSTRUCTION: You MUST use the exact currency format "{user_currency}" for ALL monetary values in your response. Do absolutely NOT use the $ symbol unless "{user_currency}" explicitly contains it.
+    
     Here is the user's spending data for the last 30 days:
-    - Total Income: {total_income}
-    - Total Expenses: {total_expense}
+    - Total Income: {user_currency} {total_income}
+    - Total Expenses: {user_currency} {total_expense}
     - Expense Categories Breakdown: {categories}
     
     Analyze this and provide exactly 3 short, punchy, and actionable financial insights. 
@@ -48,8 +55,8 @@ def get_insights():
     """
     
     try:
-        # Utilizing Gemini's flash model for rapid text generation
-        model = genai.GenerativeModel('gemini-3.6-flash') 
+        # Changed to 1.5-flash as 3.6 does not exist
+        model = genai.GenerativeModel('gemini-1.5-flash') 
         response = model.generate_content(prompt)
         
         # Clean up the response into a list of strings

@@ -68,7 +68,12 @@ class _AnalysisPageState extends State<AnalysisPage> {
 
   Future<void> _generateInsights() async {
     setState(() => _isGeneratingInsights = true);
-    final insights = await ApiService.getAiInsights();
+    
+    // ── Grab the active currency from the global notifier ──
+    final currentCurrency = currencyNotifier.value; 
+    
+    // Pass the currency to the API
+    final insights = await ApiService.getAiInsights(currentCurrency);
     
     if (mounted) {
       setState(() {

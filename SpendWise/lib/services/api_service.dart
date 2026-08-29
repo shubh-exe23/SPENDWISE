@@ -584,10 +584,18 @@ static Future<Map<String, dynamic>?> sendMagicEntry(String text) async {
     }
   }
   // ── 6. GET AI FINANCIAL INSIGHTS ──
-  static Future<List<String>> getAiInsights() async {
+  // ── 6. GET AI FINANCIAL INSIGHTS ──
+  static Future<List<String>> getAiInsights(String currency) async {
     try {
       final headers = await _headers;
-      final response = await http.get(Uri.parse('$baseUrl/analysis/insights'), headers: headers);
+      
+      // We encode the currency (e.g., '₹ INR' becomes '%E2%82%B9%20INR') so it doesn't break the URL
+      final encodedCurrency = Uri.encodeComponent(currency);
+      
+      final response = await http.get(
+        Uri.parse('$baseUrl/analysis/insights?currency=$encodedCurrency'), 
+        headers: headers
+      );
       
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
