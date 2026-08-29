@@ -56,7 +56,7 @@ def get_insights():
     
     try:
         # Changed to 1.5-flash as 3.6 does not exist
-        model = genai.GenerativeModel('gemini-1.5-flash') 
+        model = genai.GenerativeModel('gemini-3.6-flash') 
         response = model.generate_content(prompt)
         
         # Clean up the response into a list of strings
