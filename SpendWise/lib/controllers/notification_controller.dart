@@ -8,7 +8,6 @@ import '../services/notification_service.dart';
 class NotificationController {
   List<AppNotification> _notifications = [];
   
-  // ── 1. NEW DYNAMIC STATE TRACKING ──
   final Map<String, double> _previousSpent = {};
   bool _isFirstCheck = true;
 
@@ -17,13 +16,11 @@ class NotificationController {
   int get unreadCount => unread.length;
   bool get hasUnread => unread.isNotEmpty;
 
-  // ── 2. Fetch from Database ──
   Future<void> loadNotifications() async {
     final data = await ApiService.getNotifications();
     _notifications = data.map((n) => AppNotification.fromMap(n)).toList();
   }
 
-  // ── 3. Mark as read in Database ──
   Future<void> markAllRead() async {
     for (var n in _notifications) {
       n.isRead = true;
@@ -31,31 +28,28 @@ class NotificationController {
     await ApiService.markAllNotificationsRead();
   }
 
-  // ── 4. Check Goals and Save/Push Alerts ──
   Future<void> checkGoals(List<Goal> goals, TransactionController txController) async {
     final prefs = await SharedPreferences.getInstance();
     final alertsEnabled = prefs.getBool('goal_alerts') ?? true; 
 
     for (final goal in goals) {
-      final safeGoalCat = goal.category.trim().toLowerCase();
+      final safeGoalName = goal.name.trim().toLowerCase();
 
       final spent = txController.allTransactions
           .where((t) {
             final safeTxnCat = t.category.trim().toLowerCase();
             return t.isExpense && 
-                   safeTxnCat == safeGoalCat && 
+                   safeTxnCat == safeGoalName && 
                    !t.date.isBefore(goal.startDate) && 
                    !t.date.isAfter(goal.endDate);
           })
           .fold(0.0, (sum, t) => sum + t.amount);
 
-      // ── THE FIX: Detect if we JUST crossed the line ──
       final prevSpent = _previousSpent[goal.name] ?? spent;
       _previousSpent[goal.name] = spent;
 
-      if (_isFirstCheck) continue; // Prevent spam on initial app launch
+      if (_isFirstCheck) continue; 
 
-      // ── CHECK FOR BUDGET EXCEEDED ──
       if (spent > goal.budgetAmount && prevSpent <= goal.budgetAmount) {
         
         final message = 'You have exceeded your ${goal.name} budget. Total spent: ${spent.toStringAsFixed(0)}';
@@ -75,7 +69,6 @@ class NotificationController {
           await NotificationService.showExceeded(goalName: goal.name, exceededBy: exceededBy);
         }
         
-      // ── CHECK FOR WARNING THRESHOLD ──
       } else if (goal.alertThreshold != null && spent >= goal.alertThreshold! && prevSpent < goal.alertThreshold!) {
         
         final message = 'You are close to your ${goal.name} limit. Total spent: ${spent.toStringAsFixed(0)}';
@@ -97,6 +90,6 @@ class NotificationController {
       }
     }
     
-    _isFirstCheck = false; // Turn off first check after the initial run completes
+    _isFirstCheck = false; 
   }
 }

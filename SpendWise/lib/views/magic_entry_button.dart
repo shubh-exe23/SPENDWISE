@@ -15,11 +15,10 @@ class _MagicEntryButtonState extends State<MagicEntryButton> with SingleTickerPr
   @override
   void initState() {
     super.initState();
-    // ── THE REVOLVING ANIMATION ENGINE ──
     _controller = AnimationController(
       vsync: this, 
       duration: const Duration(seconds: 3)
-    )..repeat(); // Loops forever
+    )..repeat(); 
   }
 
   @override
@@ -36,7 +35,7 @@ class _MagicEntryButtonState extends State<MagicEntryButton> with SingleTickerPr
         animation: _controller,
         builder: (context, child) {
           return Container(
-            padding: const EdgeInsets.all(2.5), // This acts as the border width
+            padding: const EdgeInsets.all(2.5), 
             decoration: BoxDecoration(
               borderRadius: BorderRadius.circular(30),
               boxShadow: [
@@ -47,13 +46,12 @@ class _MagicEntryButtonState extends State<MagicEntryButton> with SingleTickerPr
                   offset: const Offset(0, 4),
                 )
               ],
-              // ── THE REVOLVING BORDER GRADIENT ──
               gradient: SweepGradient(
                 colors: const [
-                  Color(0xFFFFC300), // Yellow
-                  Colors.pinkAccent, // Pink
-                  Colors.deepPurpleAccent, // Purple
-                  Color(0xFFFFC300), // Yellow (must match start to loop seamlessly)
+                  Color(0xFFFFC300), 
+                  Colors.pinkAccent, 
+                  Colors.deepPurpleAccent, 
+                  Color(0xFFFFC300), 
                 ],
                 transform: GradientRotation(_controller.value * 2 * math.pi),
               ),
@@ -61,34 +59,38 @@ class _MagicEntryButtonState extends State<MagicEntryButton> with SingleTickerPr
             child: child,
           );
         },
-        // ── THE INNER JADE TO MANGO BUTTON ──
         child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+          padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(30),
             gradient: const LinearGradient(
               colors: [
-                Color(0xFF3EB489), // Jade Green
-                Color(0xFFFFC300), // Mango Yellow
+                Color(0xFF3EB489), 
+                Color(0xFFFFC300), 
               ],
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
             ),
           ),
-          child: const Row(
+          child: const Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Icon(Icons.auto_awesome, color: Colors.white, size: 20),
-              SizedBox(width: 8),
-              Text(
-                "Magic Entry",
-                style: TextStyle(
-                  color: Colors.white,
-                  fontWeight: FontWeight.bold,
-                  fontSize: 14,
-                  letterSpacing: 0.5,
-                ),
-              ),
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(Icons.auto_awesome, color: Colors.white, size: 20),
+                  SizedBox(width: 8),
+                  Text(
+                    "Magic Entry",
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 15,
+                      letterSpacing: 0.5,
+                    ),
+                  ),
+                ],
+              )
             ],
           ),
         ),

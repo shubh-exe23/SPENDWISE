@@ -27,38 +27,53 @@ class _FloatingActionState extends State<FloatingAction> {
   bool _isRecurring = false; 
   String _frequency = 'monthly'; 
 
-  // ── DYNAMIC CATEGORY LISTS ──
   late List<String> _expenseCategories;
   late List<String> _incomeCategories;
 
-  // ── SEPARATE PAYMENT METHODS ──
   final List<String> _expensePaymentMethods = ['Cash', 'UPI', 'Credit Card', 'Debit Card']; 
   final List<String> _incomePaymentMethods = ['Bank Transfer', 'UPI', 'Cash']; 
   
   static const _jade = Color(0xFF3EB489);
 
-  // ── DYNAMICALLY LOAD CATEGORIES IN INITSTATE ──
   @override
   void initState() {
     super.initState();
     
-    // 1. Default Baseline Categories
     final defaultExpense = {'Food', 'Hobbies', 'Study', 'Travel', 'Extra'};
     final defaultIncome = {'Salary', 'Bank Interest', 'Selling', 'Business', 'Allowance'};
     
-    // 2. Extract custom categories from past transactions, splitting by type!
     final pastExpense = widget.controller.allTransactions.where((t) => t.isExpense).map((t) => t.category).toSet();
     final pastIncome = widget.controller.allTransactions.where((t) => !t.isExpense).map((t) => t.category).toSet();
     
-    // 3. Merge them
     _expenseCategories = defaultExpense.union(pastExpense).toList();
     _incomeCategories = defaultIncome.union(pastIncome).toList();
     
-    // 4. Set Initial Values
+    _fetchGoalsAsCategories();
+    
     if (!_expenseCategories.contains(_selectedCategory)) {
-      _selectedCategory = _expenseCategories.isNotEmpty ? _expenseCategories.first : 'Food';
+      if (_expenseCategories.isNotEmpty) {
+        _selectedCategory = _expenseCategories.first;
+      } else {
+        _selectedCategory = 'Food';
+        _expenseCategories.add('Food');
+      }
     }
+    
     _selectedPaymentMethod = _expensePaymentMethods.first;
+  }
+
+  Future<void> _fetchGoalsAsCategories() async {
+    final goalsList = await ApiService.getGoals();
+    if (mounted) {
+      setState(() {
+        for (var goal in goalsList) {
+          final goalName = goal['name'].toString().trim();
+          if (goalName.isNotEmpty && !_expenseCategories.contains(goalName)) {
+            _expenseCategories.add(goalName);
+          }
+        }
+      });
+    }
   }
 
   @override

@@ -30,10 +30,8 @@ class _GoalsPageState extends State<GoalsPage> {
   static const _jadeChip  = Color(0xFFCCEDE2);
 
   double _spentForGoal(Goal goal) {
-    final safeGoalCat = goal.category.trim().toLowerCase();
+    final safeGoalName = goal.name.trim().toLowerCase();
 
-    // ── THE FIX: Normalize goal date bounds to whole days ──
-    // Start at 00:00:00.000 of start date
     final startOfDay = DateTime(
       goal.startDate.year,
       goal.startDate.month,
@@ -41,7 +39,6 @@ class _GoalsPageState extends State<GoalsPage> {
       0, 0, 0, 0,
     );
 
-    // End at 23:59:59.999 of end date
     final endOfDay = DateTime(
       goal.endDate.year,
       goal.endDate.month,
@@ -54,7 +51,7 @@ class _GoalsPageState extends State<GoalsPage> {
           final safeTxnCat = t.category.trim().toLowerCase();
           
           return t.isExpense && 
-                 safeTxnCat == safeGoalCat && 
+                 safeTxnCat == safeGoalName && 
                  !t.date.isBefore(startOfDay) && 
                  !t.date.isAfter(endOfDay);
         })
@@ -210,16 +207,6 @@ class _GoalsPageState extends State<GoalsPage> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(goal.name, style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: textColor)),
-                    const SizedBox(height: 2),
-                    Row(
-                      children: [
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                          decoration: BoxDecoration(color: isDark ? Colors.white12 : _jadeSoft, borderRadius: BorderRadius.circular(6)),
-                          child: Text(goal.category, style: TextStyle(fontSize: 11, color: isDark ? Colors.white : _jadeDark, fontWeight: FontWeight.w600)),
-                        ),
-                      ],
-                    ),
                   ],
                 ),
               ),
@@ -321,11 +308,11 @@ class _GoalsPageState extends State<GoalsPage> {
   String _formatDate(DateTime d) => '${d.day.toString().padLeft(2, '0')}/${d.month.toString().padLeft(2, '0')}/${d.year}';
 
   void _showCreateGoalSheet() {
-    showModalBottomSheet(context: context, isScrollControlled: true, backgroundColor: Colors.transparent, builder: (_) => _GoalForm(categories: _getCategories(), onSuccess: widget.onGoalsChanged));
+    showModalBottomSheet(context: context, isScrollControlled: true, backgroundColor: Colors.transparent, builder: (_) => _GoalForm(onSuccess: widget.onGoalsChanged));
   }
 
   void _showEditGoalSheet(Goal goal) {
-    showModalBottomSheet(context: context, isScrollControlled: true, backgroundColor: Colors.transparent, builder: (_) => _GoalForm(categories: _getCategories(), existingGoal: goal, onSuccess: widget.onGoalsChanged));
+    showModalBottomSheet(context: context, isScrollControlled: true, backgroundColor: Colors.transparent, builder: (_) => _GoalForm(existingGoal: goal, onSuccess: widget.onGoalsChanged));
   }
 
   void _confirmDeleteGoal(Goal goal, Color cardBg, Color textColor) {
@@ -372,24 +359,13 @@ class _GoalsPageState extends State<GoalsPage> {
       ),
     );
   }
-
-  List<String> _getCategories() {
-    final fromTransactions = widget.controller.allTransactions.map((t) => t.category).toSet().toList();
-    final defaults = ['Food', 'Hobbies', 'Study', 'Travel', 'Extra'];
-    return {...defaults, ...fromTransactions}.toList();
-  }
 }
 
-// ════════════════════════════════════════
-//         GOAL FORM (bottom sheet)
-// ════════════════════════════════════════
-
 class _GoalForm extends StatefulWidget {
-  final List<String> categories;
   final VoidCallback onSuccess;
   final Goal? existingGoal;
 
-  const _GoalForm({required this.categories, required this.onSuccess, this.existingGoal});
+  const _GoalForm({required this.onSuccess, this.existingGoal});
 
   @override
   State<_GoalForm> createState() => _GoalFormState();
@@ -399,13 +375,12 @@ class _GoalFormState extends State<_GoalForm> {
   static const _jade     = Color(0xFF3EB489);
   static const _jadeDark = Color(0xFF2A7D5F);
 
-  final _formKey   = GlobalKey<FormState>();
-  final _nameCtrl  = TextEditingController();
-  final _amountCtrl = TextEditingController();
-
-  String? _selectedCategory;
+  final _formKey        = GlobalKey<FormState>();
+  final _nameCtrl       = TextEditingController();
+  final _amountCtrl     = TextEditingController();
+  // ── NEW: Controller for the manual alert limit ──
+  final _thresholdCtrl  = TextEditingController();
   
-  // ── FIX: Initialize normalized dates ──
   late DateTime _startDate;
   late DateTime _endDate;
   bool _isLoading = false;
@@ -428,11 +403,12 @@ class _GoalFormState extends State<_GoalForm> {
       _nameCtrl.text      = g.name;
       _amountCtrl.text    = g.budgetAmount.toString();
       _budgetAmount       = g.budgetAmount;
-      _selectedCategory   = g.category;
       _startDate          = g.startDate;
       _endDate            = g.endDate;
       if (g.alertThreshold != null) {
         _alertThreshold = g.alertThreshold!;
+        // Initialize the new text field with existing threshold
+        _thresholdCtrl.text = _alertThreshold.toStringAsFixed(0);
       }
     }
   }
@@ -440,8 +416,10 @@ class _GoalFormState extends State<_GoalForm> {
   void _updateBudgetFromText() {
     setState(() {
       _budgetAmount = double.tryParse(_amountCtrl.text.trim()) ?? 0.0;
+      // Clamp the threshold to the new budget amount if it exceeds it
       if (_alertThreshold > _budgetAmount) {
         _alertThreshold = _budgetAmount;
+        _thresholdCtrl.text = _alertThreshold.toStringAsFixed(0);
       }
     });
   }
@@ -451,6 +429,7 @@ class _GoalFormState extends State<_GoalForm> {
     _amountCtrl.removeListener(_updateBudgetFromText);
     _nameCtrl.dispose();
     _amountCtrl.dispose();
+    _thresholdCtrl.dispose(); // ── NEW: Dispose ──
     super.dispose();
   }
 
@@ -478,8 +457,10 @@ class _GoalFormState extends State<_GoalForm> {
 
   Future<void> _submit() async {
     if (!_formKey.currentState!.validate()) return;
-    if (_selectedCategory == null) { ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Please select a category'))); return; }
-    if (!_endDate.isAfter(_startDate)) { ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('End date must be after start date'))); return; }
+    if (!_endDate.isAfter(_startDate)) { 
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('End date must be after start date'))); 
+      return; 
+    }
 
     setState(() => _isLoading = true);
 
@@ -488,7 +469,6 @@ class _GoalFormState extends State<_GoalForm> {
     final goal = Goal(
       id:             widget.existingGoal?.id, 
       name:           _nameCtrl.text.trim(),
-      category:       _selectedCategory!,
       budgetAmount:   _budgetAmount,
       startDate:      DateTime(_startDate.year, _startDate.month, _startDate.day, 0, 0, 0),
       endDate:        DateTime(_endDate.year, _endDate.month, _endDate.day, 23, 59, 59),
@@ -522,7 +502,7 @@ class _GoalFormState extends State<_GoalForm> {
     final textColor   = isDarkMode ? Colors.white : _jadeDark;
     final hintColor   = isDarkMode ? Colors.white54 : Colors.grey.shade500;
     final borderColor = isDarkMode ? Colors.white12 : const Color(0xFFCCEDE2);
-    final chipBg     = isDarkMode ? const Color(0xFF3B3B4F) : const Color(0xFFCCEDE2);
+    final chipBg      = isDarkMode ? Colors.white12 : const Color(0xFFE8F5F0);
 
     return Container(
       decoration: BoxDecoration(color: bg, borderRadius: const BorderRadius.vertical(top: Radius.circular(24))),
@@ -538,35 +518,99 @@ class _GoalFormState extends State<_GoalForm> {
               Text(widget.existingGoal != null ? 'Edit Goal' : 'Create Goal', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700, color: textColor)),
               const SizedBox(height: 20),
               
-              _label('Goal Name', textColor), const SizedBox(height: 8),
-              _field(controller: _nameCtrl, hint: 'e.g. June Budget, Vacation Budget', icon: Icons.flag_outlined, cardBg: cardBg, textColor: textColor, hintColor: hintColor, borderColor: borderColor, validator: (v) => (v == null || v.trim().isEmpty) ? 'Name cannot be empty' : null),
-              const SizedBox(height: 20),
-              
-              _label('Category', textColor), const SizedBox(height: 8),
-              Wrap(
-                spacing: 8, runSpacing: 8,
-                children: widget.categories.map((cat) {
-                  final selected = _selectedCategory == cat;
-                  return GestureDetector(
-                    onTap: () => setState(() => _selectedCategory = cat),
-                    child: AnimatedContainer(
-                      duration: const Duration(milliseconds: 180),
-                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-                      decoration: BoxDecoration(color: selected ? _jade : chipBg, borderRadius: BorderRadius.circular(10)),
-                      child: Text(cat, style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: selected ? Colors.white : textColor)),
-                    ),
-                  );
-                }).toList(),
-              ),
+              _label('Goal Name (Acts as Category)', textColor), const SizedBox(height: 8),
+              _field(controller: _nameCtrl, hint: 'e.g. Groceries, Vacation', icon: Icons.flag_outlined, cardBg: cardBg, textColor: textColor, hintColor: hintColor, borderColor: borderColor, validator: (v) => (v == null || v.trim().isEmpty) ? 'Name cannot be empty' : null),
               const SizedBox(height: 20),
               
               _label('Budget Amount', textColor), const SizedBox(height: 8),
-              _field(controller: _amountCtrl, hint: '0.00', icon: Icons.currency_rupee, keyboardType: const TextInputType.numberWithOptions(decimal: true), inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'^\d+\.?\d{0,2}'))], cardBg: cardBg, textColor: textColor, hintColor: hintColor, borderColor: borderColor, validator: (v) { if (v == null || v.trim().isEmpty) return 'Amount cannot be empty'; if (double.tryParse(v) == null || double.parse(v) <= 0) return 'Enter a valid amount greater than 0'; return null; }),
+              _field(
+                controller: _amountCtrl, 
+                hint: '0.00', 
+                icon: Icons.currency_rupee, 
+                keyboardType: const TextInputType.numberWithOptions(decimal: true), 
+                inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'^\d+\.?\d{0,2}'))], 
+                cardBg: cardBg, 
+                textColor: textColor, 
+                hintColor: hintColor, 
+                borderColor: borderColor, 
+                validator: (v) { 
+                  if (v == null || v.trim().isEmpty) return 'Amount cannot be empty'; 
+                  if (double.tryParse(v) == null || double.parse(v) <= 0) return 'Enter a valid amount greater than 0'; 
+                  return null; 
+                }
+              ),
               const SizedBox(height: 24),
 
               _label('Alert me when spent reaches (optional)', textColor),
               const SizedBox(height: 12),
+              
               if (_budgetAmount > 0) ...[
+                // ── NEW: Manual TextField for Alert Limit ──
+                _field(
+                  controller: _thresholdCtrl,
+                  hint: 'Enter alert amount (e.g. ${_budgetAmount * 0.8})',
+                  icon: Icons.notifications_active_outlined,
+                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                  inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'^\d+\.?\d{0,2}'))],
+                  cardBg: cardBg,
+                  textColor: textColor,
+                  hintColor: hintColor,
+                  borderColor: borderColor,
+                  onChanged: (val) {
+                    setState(() {
+                      double? parsed = double.tryParse(val);
+                      if (parsed != null) {
+                        _alertThreshold = parsed > _budgetAmount ? _budgetAmount : parsed;
+                      } else {
+                        _alertThreshold = 0.0;
+                      }
+                    });
+                  },
+                ),
+                const SizedBox(height: 16),
+                
+                // ── NEW: Quick Interval Chips ──
+                Row(
+                  children: [0.5, 0.75, 0.9, 1.0].map((percent) {
+                    final val = _budgetAmount * percent;
+                    final isSelected = _alertThreshold == val && val > 0;
+                    return Expanded(
+                      child: Padding(
+                        padding: EdgeInsets.only(right: percent == 1.0 ? 0 : 8.0),
+                        child: GestureDetector(
+                          onTap: () {
+                            setState(() {
+                              _alertThreshold = val;
+                              _thresholdCtrl.text = val.toStringAsFixed(0);
+                            });
+                          },
+                          child: AnimatedContainer(
+                            duration: const Duration(milliseconds: 200),
+                            padding: const EdgeInsets.symmetric(vertical: 8),
+                            decoration: BoxDecoration(
+                              color: isSelected ? _jade : chipBg,
+                              borderRadius: BorderRadius.circular(10),
+                              border: Border.all(color: isSelected ? _jade : borderColor),
+                            ),
+                            child: Center(
+                              child: Text(
+                                '${(percent * 100).toInt()}%',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w600,
+                                  color: isSelected ? Colors.white : textColor,
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                    );
+                  }).toList(),
+                ),
+                const SizedBox(height: 16),
+
+                // ── EXISTING: Slider ──
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
@@ -597,7 +641,15 @@ class _GoalFormState extends State<_GoalForm> {
                     min: 0,
                     max: _budgetAmount,
                     onChanged: (val) {
-                      setState(() => _alertThreshold = val);
+                      setState(() {
+                        _alertThreshold = val;
+                        // Synchronize slider drag with text field
+                        if (val == 0) {
+                          _thresholdCtrl.clear();
+                        } else {
+                          _thresholdCtrl.text = val.toStringAsFixed(0);
+                        }
+                      });
                     },
                   ),
                 ),
@@ -659,10 +711,39 @@ class _GoalFormState extends State<_GoalForm> {
 
   Widget _label(String text, Color textColor) => Text(text, style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: textColor, letterSpacing: 0.5));
   
-  Widget _field({required TextEditingController controller, required String hint, required IconData icon, TextInputType? keyboardType, List<TextInputFormatter>? inputFormatters, String? Function(String?)? validator, required Color cardBg, required Color textColor, required Color hintColor, required Color borderColor}) {
+  // ── FIX: Added the 'onChanged' parameter to support real-time typing logic ──
+  Widget _field({
+    required TextEditingController controller, 
+    required String hint, 
+    required IconData icon, 
+    TextInputType? keyboardType, 
+    List<TextInputFormatter>? inputFormatters, 
+    String? Function(String?)? validator, 
+    void Function(String)? onChanged,
+    required Color cardBg, 
+    required Color textColor, 
+    required Color hintColor, 
+    required Color borderColor
+  }) {
     return TextFormField(
-      controller: controller, keyboardType: keyboardType, inputFormatters: inputFormatters, validator: validator, style: TextStyle(fontSize: 15, color: textColor),
-      decoration: InputDecoration(hintText: hint, hintStyle: TextStyle(color: hintColor), prefixIcon: Icon(icon, color: _jade, size: 20), filled: true, fillColor: cardBg, contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14), border: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: BorderSide(color: borderColor)), enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: BorderSide(color: borderColor)), focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: const BorderSide(color: _jade, width: 1.5)), errorBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: const BorderSide(color: Colors.redAccent))),
+      controller: controller, 
+      keyboardType: keyboardType, 
+      inputFormatters: inputFormatters, 
+      validator: validator, 
+      onChanged: onChanged,
+      style: TextStyle(fontSize: 15, color: textColor),
+      decoration: InputDecoration(
+        hintText: hint, 
+        hintStyle: TextStyle(color: hintColor), 
+        prefixIcon: Icon(icon, color: _jade, size: 20), 
+        filled: true, 
+        fillColor: cardBg, 
+        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14), 
+        border: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: BorderSide(color: borderColor)), 
+        enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: BorderSide(color: borderColor)), 
+        focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: const BorderSide(color: _jade, width: 1.5)), 
+        errorBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: const BorderSide(color: Colors.redAccent))
+      ),
     );
   }
 

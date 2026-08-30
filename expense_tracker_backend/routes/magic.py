@@ -5,7 +5,8 @@ from flask import Blueprint, request, jsonify
 from flask_jwt_extended import jwt_required, get_jwt_identity
 from models.database import db
 from models.transaction import Transaction
-from models.category import Category  
+from models.category import Category
+from models.goal import Goal 
 from pydantic import BaseModel, Field
 from google import genai
 from google.genai import types
@@ -13,12 +14,12 @@ from google.genai import types
 magic_bp = Blueprint('magic', __name__)
 
 class TransactionSchema(BaseModel):
-    title: str = Field(description="A short 1-3 word title (e.g., 'Pizza', 'Swiggy', 'Salary').")
-    amount: float = Field(description="The numeric amount (e.g., 200.0).")
-    is_expense: bool = Field(description="True if spent/paid, False if received/earned (like Salary).")
+    title: str = Field(description="A short 1-3 word title (e.g., 'Cabbage', 'Masala Dosa', 'Salary').")
+    amount: float = Field(description="The numeric amount (e.g., 50.0).")
+    is_expense: bool = Field(description="True if spent/paid, False if received/earned.")
     date: str = Field(description="Date in YYYY-MM-DD format.")
-    category: str = Field(description="The category. You must strictly follow the category rules provided in the prompt.")
-    payment_method: str = Field(description="If expense, use Cash, UPI, Credit Card, or Debit Card. If income, use 'Bank Transfer' or 'Cash'.")
+    category: str = Field(description="The category strictly matching one of the available category options.")
+    payment_method: str = Field(description="If expense, use Cash, UPI, Credit Card, or Debit Card. If income, use Bank Transfer or Cash.")
 
 @magic_bp.route('/entry', methods=['POST'])
 @jwt_required()
@@ -33,41 +34,64 @@ def magic_entry():
     try:
         client = genai.Client(api_key=os.environ.get("GEMINI_API_KEY"))
 
-        # ── 1. DYNAMICALLY SCAN ALL USER DATA & MERGE WITH DEFAULTS ──
-        
-        # A. Fetch user's custom categories from the Category table
         user_cats = Category.query.filter_by(user_id=user_id).all()
-        db_cat_names = {c.name for c in user_cats}
+        db_cat_names = {c.name for c in user_cats if c.name}
         
-        # B. Fetch historical categories from the user's past transactions
+        user_goals = Goal.query.filter_by(user_id=user_id).all()
+        db_goal_names = {g.name for g in user_goals if g.name}
+        
         past_txns = Transaction.query.filter_by(user_id=user_id).with_entities(Transaction.category).distinct().all()
         past_cat_names = {t[0] for t in past_txns if t[0]}
 
-        # C. Inject the Flutter App Defaults to ensure standard buckets always exist
         flutter_defaults = {
             'Food', 'Hobbies', 'Study', 'Travel', 'Extra', 
             'Salary', 'Bank Interest', 'Selling', 'Business', 'Allowance'
         }
         
-        # Merge all sources into one comprehensive master list
-        valid_categories_list = list(flutter_defaults.union(db_cat_names).union(past_cat_names))
-            
-        # Lowercase map for safe, case-insensitive matching
+        valid_categories_list = list(flutter_defaults.union(db_cat_names).union(past_cat_names).union(db_goal_names))
         cat_map = {c.lower(): c for c in valid_categories_list}
         categories_str = ", ".join(valid_categories_list)
 
-        # ── 2. SEMANTIC PROMPT ──
+        knowledge_base = {
+            "cabbage": 'Text: "spent 50 on cabbage" -> Category: Vegetables (or Groceries / Food if Vegetables is not in available list)',
+            "vegetable": 'Text: "bought vegetables" -> Category: Vegetables (or Groceries / Food)',
+            "potato": 'Text: "potatoes" -> Category: Vegetables (or Groceries / Food)',
+            "onion": 'Text: "onions" -> Category: Vegetables (or Groceries / Food)',
+            "dosa": 'Text: "masala dosa" -> Category: Dining Out (or Food. NEVER Groceries)',
+            "restaurant": 'Text: "dinner at restaurant" -> Category: Dining Out (or Food)',
+            "swiggy": 'Text: "swiggy order" -> Category: Dining Out (or Food)',
+            "zomato": 'Text: "zomato" -> Category: Dining Out (or Food)',
+            "rice": 'Text: "10kg rice" -> Category: Groceries (or Food)',
+            "dal": 'Text: "dal and oil" -> Category: Groceries (or Food)',
+            "electricity": 'Text: "electricity bill" -> Category: Bills',
+            "netflix": 'Text: "netflix subscription" -> Category: Bills (or Entertainment)'
+        }
+
+        user_text_lower = user_text.lower()
+        relevant_examples = [ex for kw, ex in knowledge_base.items() if kw in user_text_lower]
+
+        recent_txns = Transaction.query.filter_by(user_id=user_id).order_by(Transaction.date.desc()).limit(3).all()
+        personal_examples = [f'Text: "{t.title}" -> Category: {t.category}' for t in recent_txns if t.category]
+
+        dynamic_prompt = ""
+        if relevant_examples or personal_examples:
+            dynamic_prompt += "\nDYNAMIC FEW-SHOT CONTEXT:\n"
+            if relevant_examples:
+                dynamic_prompt += "Precision Rules for this input:\n- " + "\n- ".join(relevant_examples) + "\n"
+            if personal_examples:
+                dynamic_prompt += "User's Recent Categorization Style:\n- " + "\n- ".join(personal_examples) + "\n"
+
         prompt = f"""
-        You are a highly intelligent financial extraction AI. Read the user's sentence and extract the transaction details.
+        You are an intelligent financial transaction parser. Extract details from the input sentence.
         
         RULES:
         1. Today's date is {datetime.now().strftime('%Y-%m-%d')}.
-        2. AVAILABLE CATEGORIES: [{categories_str}].
-           - You MUST select the SINGLE MOST APPROPRIATE category from the list above.
-           - Analyze the item semantically (e.g., 'Choco Moose', 'Pizza', 'Groceries' must be mapped to 'Food').
-           - DO NOT invent new categories. Pick the closest logical match from the list.
-        3. If the user does not specify a payment method, default to "Cash" for expenses and "Bank Transfer" for income.
-        4. Output ONLY raw, valid JSON.
+        2. AVAILABLE CATEGORIES: [{categories_str}]. You MUST select the SINGLE MOST APPROPRIATE category from this list.
+        3. CATEGORIZATION HIERARCHY:
+           - Raw produce (e.g., cabbage, onions, potatoes): Map to "Vegetables" if available. If not, map to "Groceries". If neither exists, fallback to "Food". NEVER map raw produce to "Dining Out".
+           - Prepared/Cooked meals (e.g., Masala Dosa, Pizza, Restaurant meals): Map to "Dining Out" if available, else "Food". NEVER map to "Groceries" or "Vegetables".
+        4. If payment method is not specified, default to "UPI" or "Cash" for expenses, and "Bank Transfer" for income.
+        {dynamic_prompt}
         
         User Input: "{user_text}"
         """
@@ -81,32 +105,20 @@ def magic_entry():
             ),
         )
 
-        raw_response = response.text.strip()
-        if raw_response.startswith('```json'):
-            raw_response = raw_response[7:]
-        if raw_response.endswith('```'):
-            raw_response = raw_response[:-3]
-        raw_response = raw_response.strip()
-
+        raw_response = response.text.strip().replace('```json', '').replace('```', '').strip()
         extracted_data = json.loads(raw_response)
         
-        # ── 3. ULTIMATE SAFETY NET ──
         ai_category_raw = extracted_data['category'].strip().lower()
         is_expense = extracted_data['is_expense']
         
         if ai_category_raw in cat_map:
-            # Safe match! Restore the exact capitalization
             final_category = cat_map[ai_category_raw] 
         else:
-            # If the AI STILL disobeys, force it into a guaranteed bucket
-            if is_expense:
-                final_category = cat_map.get('food', 'Extra') 
-            else:
-                final_category = cat_map.get('salary', 'Salary')
+            final_category = cat_map.get('food', 'Extra') if is_expense else cat_map.get('salary', 'Salary')
 
         new_txn = Transaction(
             title=extracted_data['title'],
-            amount=extracted_data['amount'],
+            amount=float(extracted_data['amount']),
             is_expense=is_expense,
             date=datetime.strptime(extracted_data['date'], '%Y-%m-%d'),
             category=final_category,
@@ -124,5 +136,4 @@ def magic_entry():
 
     except Exception as e:
         db.session.rollback()
-        print(f"\n❌ MAGIC ENTRY ERROR: {str(e)}\n") 
         return jsonify({'error': str(e)}), 500
